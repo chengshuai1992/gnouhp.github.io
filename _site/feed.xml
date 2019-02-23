@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="3.8.5">Jekyll</generator><link href="http://localhost:4000/feed.xml" rel="self" type="application/atom+xml" /><link href="http://localhost:4000/" rel="alternate" type="text/html" /><updated>2019-02-22T21:28:15-08:00</updated><id>http://localhost:4000/feed.xml</id><title type="html">Kevin Phuong</title><subtitle></subtitle><entry><title type="html">Relative Margin Loss for Visual-Semantic Embeddings (Draft)</title><link href="http://localhost:4000/jekyll/update/2019/02/19/Relative-Margin-Loss-for-Joint-Image-and-Text-Representations.html" rel="alternate" type="text/html" title="Relative Margin Loss for Visual-Semantic Embeddings (Draft)" /><published>2019-02-19T15:01:00-08:00</published><updated>2019-02-19T15:01:00-08:00</updated><id>http://localhost:4000/jekyll/update/2019/02/19/Relative-Margin-Loss-for-Joint-Image-and-Text-Representations</id><content type="html" xml:base="http://localhost:4000/jekyll/update/2019/02/19/Relative-Margin-Loss-for-Joint-Image-and-Text-Representations.html">&lt;p&gt;&lt;em&gt;This work is an overview of my own unpublished research. In these open research posts, I will be sharing my thoughts and new ideas on topics that I believe are meaningful contributions, but haven’t yet decided if I intend to write a full research paper for. Please see here (link to issues page) if you would like to discuss or collaborate on this research post!&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;br /&gt;&lt;/p&gt;
+&lt;h2 id=&quot;overview&quot;&gt;Overview&lt;/h2&gt;
+
+&lt;p&gt;The most commonly seen loss functions for Visual-Semantic embeddings, such as the hinge-rank loss and the pairwise ranking loss, all utilize an arbitrarily selected margin value, which disregards potentially valuable information of the semantic similarity across data samples. In this post, I give an example of where this shortcoming leads to suboptimal loss values, and I propose the usage of sentence encoders to replace arbitrarily chosen (and constant) margins with relative margins that are specific to the semantic similarity between contrasting image-text pairs.&lt;/p&gt;
+
+&lt;p&gt;&lt;br /&gt;&lt;/p&gt;
+&lt;h2 id=&quot;visual-semantic-embeddings&quot;&gt;Visual-Semantic Embeddings&lt;/h2&gt;
+
+&lt;p&gt;Let’s start this post with a quick explanation of visual-semantic embeddings. A visual-semantic embedding is a vector space where images and text that contain similar high-level information are mapped to vectors that are also similar to each other. This measure of similarity is most commonly defined as either the cossine similarity (which gives a similarity score based on the angles of 2 vectors) or dot-product similarity (which takes into account both the angle and magnitude of 2 vectors).&lt;/p&gt;
+
+&lt;p&gt;Below is an example of the most generic visual-semantic embedding pipeline, where images and text are encoded in parallel (no cross-feature information):&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/ImageAssets/exampleJE.png&quot; alt=&quot;Generic Joint Embedding Pipeline&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;br /&gt;&lt;/p&gt;
+&lt;h2 id=&quot;arbitrarily-selected-margins-arent-aligned-with-human-intuition&quot;&gt;Arbitrarily Selected Margins Aren’t Aligned With Human Intuition&lt;/h2&gt;
+
+&lt;p&gt;In order to train the joint embedding model, the following loss function is commonly used:&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;loss(image, caption) =&lt;/em&gt; max &lt;em&gt;[0, margin - S(U(image), V(caption)) + S(U(image), V(caption&lt;sub&gt;j&lt;/sub&gt; ))]&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;where:&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;U&lt;/em&gt; = Computer Vision Model (i.e. VGG19, ResNet101, SqueezeNet, etc),&lt;br /&gt;
+&lt;em&gt;V&lt;/em&gt; = Natural Language Model (i.e. Universal Sentence Encoder, InferSent, Quick-Thoughts, etc),&lt;br /&gt;
+&lt;em&gt;S&lt;/em&gt; = Similarity Function (i.e. Cossine Similarity, Dot-Product Similarity, etc), &lt;br /&gt;
+&lt;em&gt;caption&lt;sub&gt;j&lt;/sub&gt;&lt;/em&gt; = a caption that isn’t paired with the image.&lt;/p&gt;
+
+&lt;p&gt;Essentially, if the similarity between an image embedding vector, &lt;strong&gt;U(image)&lt;/strong&gt;, and one of its true captions, &lt;strong&gt;V(caption)&lt;/strong&gt;, is less than a pre-defined distance of the image and a randomly selected caption &lt;strong&gt;V(caption&lt;sub&gt;j&lt;/sub&gt;)&lt;/strong&gt; from the batch is less than the margin, then this contributes to the pairwise ranking loss. I noticed that there are cases where the one-size-fits all margin choice strategy fails to propagate valuable loss to the model.&lt;/p&gt;
+
+&lt;p&gt;Here’s example input data that I’ll be using to illustrate some points for the rest of the post:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/ImageAssets/exampleImgCaps.png&quot; alt=&quot;Sample Image-Caption Data&quot; /&gt;
+&lt;br /&gt;&lt;/p&gt;
+&lt;h4 id=&quot;an-example-where-the-arbitrary-margin-is-too-large&quot;&gt;An example where the arbitrary margin is &lt;em&gt;too large&lt;/em&gt;&lt;/h4&gt;
+&lt;p&gt;Imagine that our model predicts the following:&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;S(V(&lt;/em&gt;“Two dogs on the grass on a sunny day”&lt;em&gt;), U(Image&lt;sub&gt;pugs&lt;/sub&gt;)) = 1.0&lt;/em&gt;, and&lt;br /&gt;
+&lt;em&gt;S(V(&lt;/em&gt;“Two dogs on the grass on a sunny day”&lt;em&gt;), U(Image&lt;sub&gt;retrievers&lt;/sub&gt;)) = .95&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;This would result in a loss of:&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;L =&lt;/em&gt; max &lt;em&gt;[0, margin - 1.0 + .95]&lt;/em&gt; ,  and assuming &lt;em&gt;margin = .2&lt;/em&gt;,&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;L =&lt;/em&gt; max &lt;em&gt;[0, .2 - 1.0 + .95] = .15&lt;/em&gt;.&lt;/p&gt;
+
+&lt;p&gt;Our model is penalized for having similar vector embeddings for “Two dogs on the grass on a sunny day” and the image of golden retrievers, even though the caption could reasonably describe both images. We would want a &lt;em&gt;decreased&lt;/em&gt; margin for these types of related image-caption pairs.&lt;/p&gt;
+
+&lt;p&gt;&lt;br /&gt;&lt;/p&gt;
+&lt;h4 id=&quot;an-example-where-the-arbitrary-margin-is-too-small&quot;&gt;An example where the arbitrary margin is &lt;em&gt;too small&lt;/em&gt;&lt;/h4&gt;
+
+&lt;p&gt;Once again, let’s look at hypothetical predictions from the model during training:&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;S(V(&lt;/em&gt;“Two dogs on the grass on a sunny day”&lt;em&gt;), U(Image&lt;sub&gt;pugs&lt;/sub&gt;)) = 1.0&lt;/em&gt;, and&lt;br /&gt;
+ &lt;em&gt;S(V(&lt;/em&gt;“Two dogs on the grass on a sunny day”&lt;em&gt;), U(Image&lt;sub&gt;bread&lt;/sub&gt;)) = .79&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;This would result in a loss of:&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;L =&lt;/em&gt; max &lt;em&gt;[0, margin - 1.0 + .79]&lt;/em&gt; ,  and assuming &lt;em&gt;margin = .2&lt;/em&gt;,&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;L =&lt;/em&gt; max &lt;em&gt;[0, .2 - 1.0 + .79] = 0&lt;/em&gt;.&lt;/p&gt;
+
+&lt;p&gt;Our model isn’t penalized for having similar vector embeddings for “Two dogs on the grass on a sunny day” and the image of bread, even though the caption and the image are completely unrelated. We would want an &lt;em&gt;increased&lt;/em&gt; margin for completely unrelated image-caption pairs.&lt;/p&gt;
+
+&lt;p&gt;Can we do better than an arbitrarily chosen margin value across all image-caption pairs?&lt;/p&gt;
+
+&lt;p&gt;&lt;br /&gt;&lt;/p&gt;
+&lt;h2 id=&quot;relative-margin-loss&quot;&gt;Relative Margin Loss&lt;/h2&gt;
+
+&lt;p&gt;How can we get margins that are specific to each unmatched image and caption pair? I propose the usage of universal sentence embeddings, which are recent advances in natural language processing that encode sentences into vectors of a fixed dimension. There are many approaches, from the simplest being the Bag-of-Words baseline, to unsupervised approaches such as Skip-Thought and Quick-Thought vectors, to supervised approaches like InferSent, and finally, to methods that combine both supervised and unsupervised learning, such as Google’s Universal Sentence Encoder, which is what I use for the preliminary experiments.&lt;/p&gt;
+
+&lt;p&gt;The Universal Sentence Encoder is publicly available on tfhub and the sentence embeddings are normalized and tuned for the task of semantic similarity, which is what we are interested in finding out. Here are two heatmaps that show the semantic similarities between the captions of the first image against the other two images:&lt;/p&gt;
+
+&lt;p float=&quot;left&quot;&gt;
+	&lt;img src=&quot;/ImageAssets/heatMapImg.png&quot; width=&quot;500&quot; /&gt;
+	&lt;img src=&quot;/ImageAssets/heatMapImg2.png&quot; width=&quot;500&quot; /&gt;
+	&lt;figcaption&gt;We can see that the captions concerning the dog images are much more semantically related than the dog/bread pair.&lt;/figcaption&gt;
+&lt;/p&gt;
+&lt;p&gt;&lt;br /&gt;&lt;/p&gt;
+
+&lt;p&gt;I propose the &lt;em&gt;relative margin loss&lt;/em&gt;, a loss function that takes into consideration the semantic similarity between descriptions across samples in order to get better margin values. I first test a basic, baseline version of the relative margin loss, where I get the candidate margin values by the following equation:&lt;/p&gt;
+
+&lt;center&gt; &lt;i&gt;1 - S(Captions&lt;sub&gt;i&lt;/sub&gt; , Captions&lt;sub&gt;j&lt;/sub&gt; )&lt;/i&gt; &lt;/center&gt;
+
+&lt;p&gt;where &lt;em&gt;i&lt;/em&gt; and &lt;em&gt;j&lt;/em&gt; denote different samples in the dataset.&lt;/p&gt;
+
+&lt;p&gt;Here are the relative margin candidate values, high for unrelated caption and image pairs, and lower margins for those more semantically related:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/ImageAssets/marginMap1.png&quot; alt=&quot;drawing&quot; width=&quot;500&quot; /&gt;
+&lt;img src=&quot;/ImageAssets/marginMap2.png&quot; alt=&quot;drawing&quot; width=&quot;500&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;From here, we can get the final relative margin values by selecting the minimum of the candidate values for each row, and we’re left with the following:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/ImageAssets/RelativeMarginValues.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;br /&gt;&lt;/p&gt;
+&lt;h2 id=&quot;preliminary-results&quot;&gt;Preliminary Results&lt;/h2&gt;
+
+&lt;p&gt;I’ve tested out the relative margin loss on the Flickr30k and MS-COCO dataset which has 82,000 training images. Both datasets have 5 captions for each image, and test datasets of size 1000. Preliminary results look like my intuition could be correct, and that using relative margins could significantly improve results.&lt;/p&gt;
+
+&lt;p float=&quot;left&quot;&gt;
+	&lt;img src=&quot;/ImageAssets/mscocoRes.png&quot; width=&quot;350&quot; /&gt;
+	&lt;img src=&quot;/ImageAssets/flickr30kResImg.png&quot; width=&quot;350&quot; /&gt;
+	&lt;figcaption&gt;&lt;i&gt;Solid lines represent the results of models trained with relative margin values, dotted lines show results of using constant margin=.2. Higher values are better.&lt;/i&gt;&lt;/figcaption&gt;
+&lt;/p&gt;</content><author><name></name></author><summary type="html">This work is an overview of my own unpublished research. In these open research posts, I will be sharing my thoughts and new ideas on topics that I believe are meaningful contributions, but haven’t yet decided if I intend to write a full research paper for. Please see here (link to issues page) if you would like to discuss or collaborate on this research post!</summary></entry></feed>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.5.0 -->
+<title>Relative Margin Loss for Visual-Semantic Embeddings (Draft) | Kevin Phuong</title>
+<meta name="generator" content="Jekyll v3.8.5" />
+<meta property="og:title" content="Relative Margin Loss for Visual-Semantic Embeddings (Draft)" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="This work is an overview of my own unpublished research. In these open research posts, I will be sharing my thoughts and new ideas on topics that I believe are meaningful contributions, but haven’t yet decided if I intend to write a full research paper for. Please see here (link to issues page) if you would like to discuss or collaborate on this research post!" />
+<meta property="og:description" content="This work is an overview of my own unpublished research. In these open research posts, I will be sharing my thoughts and new ideas on topics that I believe are meaningful contributions, but haven’t yet decided if I intend to write a full research paper for. Please see here (link to issues page) if you would like to discuss or collaborate on this research post!" />
+<link rel="canonical" href="http://localhost:4000/jekyll/update/2019/02/19/Relative-Margin-Loss-for-Joint-Image-and-Text-Representations.html" />
+<meta property="og:url" content="http://localhost:4000/jekyll/update/2019/02/19/Relative-Margin-Loss-for-Joint-Image-and-Text-Representations.html" />
+<meta property="og:site_name" content="Kevin Phuong" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2019-02-19T15:01:00-08:00" />
+<script type="application/ld+json">
+{"headline":"Relative Margin Loss for Visual-Semantic Embeddings (Draft)","dateModified":"2019-02-19T15:01:00-08:00","datePublished":"2019-02-19T15:01:00-08:00","url":"http://localhost:4000/jekyll/update/2019/02/19/Relative-Margin-Loss-for-Joint-Image-and-Text-Representations.html","mainEntityOfPage":{"@type":"WebPage","@id":"http://localhost:4000/jekyll/update/2019/02/19/Relative-Margin-Loss-for-Joint-Image-and-Text-Representations.html"},"description":"This work is an overview of my own unpublished research. In these open research posts, I will be sharing my thoughts and new ideas on topics that I believe are meaningful contributions, but haven’t yet decided if I intend to write a full research paper for. Please see here (link to issues page) if you would like to discuss or collaborate on this research post!","@type":"BlogPosting","@context":"http://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/main.css"><link type="application/atom+xml" rel="alternate" href="http://localhost:4000/feed.xml" title="Kevin Phuong" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Kevin Phuong</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <script type="text/javascript" async
+      src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-MML-AM_CHTML">
+    </script>
+    <h1 class="post-title p-name" itemprop="name headline">Relative Margin Loss for Visual-Semantic Embeddings (Draft)</h1>
+    <p class="post-meta">
+      <time class="dt-published" datetime="2019-02-19T15:01:00-08:00" itemprop="datePublished">Feb 19, 2019
+      </time></p>
+  </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <p><em>This work is an overview of my own unpublished research. In these open research posts, I will be sharing my thoughts and new ideas on topics that I believe are meaningful contributions, but haven’t yet decided if I intend to write a full research paper for. Please see here (link to issues page) if you would like to discuss or collaborate on this research post!</em></p>
+
+<p><br /></p>
+<h2 id="overview">Overview</h2>
+
+<p>The most commonly seen loss functions for Visual-Semantic embeddings, such as the hinge-rank loss and the pairwise ranking loss, all utilize an arbitrarily selected margin value, which disregards potentially valuable information of the semantic similarity across data samples. In this post, I give an example of where this shortcoming leads to suboptimal loss values, and I propose the usage of sentence encoders to replace arbitrarily chosen (and constant) margins with relative margins that are specific to the semantic similarity between contrasting image-text pairs.</p>
+
+<p><br /></p>
+<h2 id="visual-semantic-embeddings">Visual-Semantic Embeddings</h2>
+
+<p>Let’s start this post with a quick explanation of visual-semantic embeddings. A visual-semantic embedding is a vector space where images and text that contain similar high-level information are mapped to vectors that are also similar to each other. This measure of similarity is most commonly defined as either the cossine similarity (which gives a similarity score based on the angles of 2 vectors) or dot-product similarity (which takes into account both the angle and magnitude of 2 vectors).</p>
+
+<p>Below is an example of the most generic visual-semantic embedding pipeline, where images and text are encoded in parallel (no cross-feature information):</p>
+
+<p><img src="/ImageAssets/exampleJE.png" alt="Generic Joint Embedding Pipeline" /></p>
+
+<p><br /></p>
+<h2 id="arbitrarily-selected-margins-arent-aligned-with-human-intuition">Arbitrarily Selected Margins Aren’t Aligned With Human Intuition</h2>
+
+<p>In order to train the joint embedding model, the following loss function is commonly used:</p>
+
+<p><em>loss(image, caption) =</em> max <em>[0, margin - S(U(image), V(caption)) + S(U(image), V(caption<sub>j</sub> ))]</em></p>
+
+<p>where:</p>
+
+<p><em>U</em> = Computer Vision Model (i.e. VGG19, ResNet101, SqueezeNet, etc),<br />
+<em>V</em> = Natural Language Model (i.e. Universal Sentence Encoder, InferSent, Quick-Thoughts, etc),<br />
+<em>S</em> = Similarity Function (i.e. Cossine Similarity, Dot-Product Similarity, etc), <br />
+<em>caption<sub>j</sub></em> = a caption that isn’t paired with the image.</p>
+
+<p>Essentially, if the similarity between an image embedding vector, <strong>U(image)</strong>, and one of its true captions, <strong>V(caption)</strong>, is less than a pre-defined distance of the image and a randomly selected caption <strong>V(caption<sub>j</sub>)</strong> from the batch is less than the margin, then this contributes to the pairwise ranking loss. I noticed that there are cases where the one-size-fits all margin choice strategy fails to propagate valuable loss to the model.</p>
+
+<p>Here’s example input data that I’ll be using to illustrate some points for the rest of the post:</p>
+
+<p><img src="/ImageAssets/exampleImgCaps.png" alt="Sample Image-Caption Data" />
+<br /></p>
+<h4 id="an-example-where-the-arbitrary-margin-is-too-large">An example where the arbitrary margin is <em>too large</em></h4>
+<p>Imagine that our model predicts the following:</p>
+
+<p><em>S(V(</em>“Two dogs on the grass on a sunny day”<em>), U(Image<sub>pugs</sub>)) = 1.0</em>, and<br />
+<em>S(V(</em>“Two dogs on the grass on a sunny day”<em>), U(Image<sub>retrievers</sub>)) = .95</em></p>
+
+<p>This would result in a loss of:</p>
+
+<p><em>L =</em> max <em>[0, margin - 1.0 + .95]</em> ,  and assuming <em>margin = .2</em>,</p>
+
+<p><em>L =</em> max <em>[0, .2 - 1.0 + .95] = .15</em>.</p>
+
+<p>Our model is penalized for having similar vector embeddings for “Two dogs on the grass on a sunny day” and the image of golden retrievers, even though the caption could reasonably describe both images. We would want a <em>decreased</em> margin for these types of related image-caption pairs.</p>
+
+<p><br /></p>
+<h4 id="an-example-where-the-arbitrary-margin-is-too-small">An example where the arbitrary margin is <em>too small</em></h4>
+
+<p>Once again, let’s look at hypothetical predictions from the model during training:</p>
+
+<p><em>S(V(</em>“Two dogs on the grass on a sunny day”<em>), U(Image<sub>pugs</sub>)) = 1.0</em>, and<br />
+ <em>S(V(</em>“Two dogs on the grass on a sunny day”<em>), U(Image<sub>bread</sub>)) = .79</em></p>
+
+<p>This would result in a loss of:</p>
+
+<p><em>L =</em> max <em>[0, margin - 1.0 + .79]</em> ,  and assuming <em>margin = .2</em>,</p>
+
+<p><em>L =</em> max <em>[0, .2 - 1.0 + .79] = 0</em>.</p>
+
+<p>Our model isn’t penalized for having similar vector embeddings for “Two dogs on the grass on a sunny day” and the image of bread, even though the caption and the image are completely unrelated. We would want an <em>increased</em> margin for completely unrelated image-caption pairs.</p>
+
+<p>Can we do better than an arbitrarily chosen margin value across all image-caption pairs?</p>
+
+<p><br /></p>
+<h2 id="relative-margin-loss">Relative Margin Loss</h2>
+
+<p>How can we get margins that are specific to each unmatched image and caption pair? I propose the usage of universal sentence embeddings, which are recent advances in natural language processing that encode sentences into vectors of a fixed dimension. There are many approaches, from the simplest being the Bag-of-Words baseline, to unsupervised approaches such as Skip-Thought and Quick-Thought vectors, to supervised approaches like InferSent, and finally, to methods that combine both supervised and unsupervised learning, such as Google’s Universal Sentence Encoder, which is what I use for the preliminary experiments.</p>
+
+<p>The Universal Sentence Encoder is publicly available on tfhub and the sentence embeddings are normalized and tuned for the task of semantic similarity, which is what we are interested in finding out. Here are two heatmaps that show the semantic similarities between the captions of the first image against the other two images:</p>
+
+<p float="left">
+	<img src="/ImageAssets/heatMapImg.png" width="500" />
+	<img src="/ImageAssets/heatMapImg2.png" width="500" />
+	<figcaption>We can see that the captions concerning the dog images are much more semantically related than the dog/bread pair.</figcaption>
+</p>
+<p><br /></p>
+
+<p>I propose the <em>relative margin loss</em>, a loss function that takes into consideration the semantic similarity between descriptions across samples in order to get better margin values. I first test a basic, baseline version of the relative margin loss, where I get the candidate margin values by the following equation:</p>
+
+<center> <i>1 - S(Captions<sub>i</sub> , Captions<sub>j</sub> )</i> </center>
+
+<p>where <em>i</em> and <em>j</em> denote different samples in the dataset.</p>
+
+<p>Here are the relative margin candidate values, high for unrelated caption and image pairs, and lower margins for those more semantically related:</p>
+
+<p><img src="/ImageAssets/marginMap1.png" alt="drawing" width="500" />
+<img src="/ImageAssets/marginMap2.png" alt="drawing" width="500" /></p>
+
+<p>From here, we can get the final relative margin values by selecting the minimum of the candidate values for each row, and we’re left with the following:</p>
+
+<p><img src="/ImageAssets/RelativeMarginValues.png" alt="" /></p>
+
+<p><br /></p>
+<h2 id="preliminary-results">Preliminary Results</h2>
+
+<p>I’ve tested out the relative margin loss on the Flickr30k and MS-COCO dataset which has 82,000 training images. Both datasets have 5 captions for each image, and test datasets of size 1000. Preliminary results look like my intuition could be correct, and that using relative margins could significantly improve results.</p>
+
+<p float="left">
+	<img src="/ImageAssets/mscocoRes.png" width="350" />
+	<img src="/ImageAssets/flickr30kResImg.png" width="350" />
+	<figcaption><i>Solid lines represent the results of models trained with relative margin values, dotted lines show results of using constant margin=.2. Higher values are better.</i></figcaption>
+</p>
+
+  </div><a class="u-url" href="/jekyll/update/2019/02/19/Relative-Margin-Loss-for-Joint-Image-and-Text-Representations.html" hidden></a>
+</article>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">Kevin Phuong</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">Kevin Phuong</li></ul>
+      </div>
+
+      <div class="footer-col footer-col-2"><ul class="social-media-list"><li><a href="https://github.com/gnouhp"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg> <span class="username">gnouhp</span></a></li></ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p></p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>
